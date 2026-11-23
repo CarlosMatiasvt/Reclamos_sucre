@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administración · Reclamos Sucre</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f3f5f7;--c:#fff;--tx:#17202a;--m:#5b6673;--bd:#d9dee4;--ac:#1d4e89;--r:#c9372c;--y:#e0a100;--g:#2a9158}
+@media (prefers-color-scheme:dark){:root{--bg:#12161b;--c:#1b2027;--tx:#e8ebef;--m:#98a2ae;--bd:#2c333c;--ac:#6fa8ff}}
+[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14.5px/1.5 system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--c);border-bottom:1px solid var(--bd)}
+h1{font-size:17px;margin:0}button{font:inherit;font-weight:600;border:1px solid var(--ac);background:var(--ac);color:#fff;border-radius:6px;padding:7px 12px;cursor:pointer}
+button.s{background:transparent;color:var(--ac)}input{padding:9px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit;width:100%;margin:4px 0 10px}
+#login{max-width:340px;margin:12vh auto;background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:20px}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px}nav button{background:var(--c);color:var(--tx);border-color:var(--bd)}nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.b{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--r);color:#fff;font-size:12px;margin-left:5px}
+main{display:grid;grid-template-columns:1fr 330px;gap:12px;padding:0 16px 16px}@media(max-width:860px){main{grid-template-columns:1fr}}
+#map{height:68vh;min-height:380px;border-radius:8px;border:1px solid var(--bd)}
+aside{background:var(--c);border:1px solid var(--bd);border-radius:8px;padding:10px;max-height:68vh;overflow:auto}
+.it{padding:8px 0;border-top:1px solid var(--bd);font-size:13px;cursor:pointer}.it:first-child{border:0}
+.g{display:inline-block;padding:0 7px;border-radius:9px;color:#fff;font-size:12px;font-weight:700}.g2{background:var(--r)}.g1{background:var(--y)}.g0{background:var(--g)}
+.lg{font-size:12.5px;color:var(--m);padding:0 16px 8px}
+#story{position:fixed;inset:0;background:#000d;z-index:9999;display:flex;align-items:center;justify-content:center}
+#st{position:relative;width:min(420px,100vw);height:min(86vh,760px);background:#000;border-radius:10px;overflow:hidden;color:#fff}
+#st img{width:100%;height:100%;object-fit:contain}#bars{position:absolute;top:8px;left:8px;right:8px;display:flex;gap:4px;z-index:3}
+#bars i{flex:1;height:3px;background:#fff5;border-radius:2px;overflow:hidden}#bars i.ok b{width:100%}#bars b{display:block;height:100%;width:0;background:#fff}
+@keyframes p{from{width:0}to{width:100%}}
+#cap{position:absolute;left:0;right:0;bottom:0;padding:40px 14px 14px;background:linear-gradient(transparent,#000c);font-size:14px}
+#x{position:absolute;top:16px;right:10px;z-index:4;background:#0008;border:0;font-size:20px;padding:2px 10px}
+#zl,#zr{position:absolute;top:0;bottom:0;z-index:2}#zl{left:0;width:30%}#zr{right:0;width:70%}
+</style></head><body>
+<div id="login"><h1>Administración</h1><p class="lg" style="padding:0">Acceso solo para el administrador.</p>
+ <label>Usuario<input id="u" autocomplete="username"></label><label>Contraseña<input id="p" type="password" autocomplete="current-password"></label>
+ <button id="go" style="width:100%">Entrar</button><p id="le" style="color:var(--r);min-height:1.2em"></p></div>
+<div id="app" hidden>
+ <header><h1>Reclamos de Sucre · Administración</h1><button class="s" id="out">Salir</button></header>
+ <nav id="tabs"></nav>
+ <div class="lg"><b style="color:var(--r)">■</b> Zona roja: emergencia · <b style="color:var(--y)">■</b> amarilla: moderada · <b style="color:var(--g)">■</b> verde: leve. Haz clic en un punto o zona para ver sus fotos como historias.</div>
+ <main id="vista"><div id="map"></div><aside id="lista"></aside></main>
+ <section id="sol" hidden style="margin:0 16px 16px;background:var(--c);border:1px solid var(--bd);border-radius:8px;padding:12px"></section>
+</div>
+<div id="story" hidden><div id="st"><div id="bars"></div><button id="x" aria-label="Cerrar">✕</button><div id="zl"></div><div id="zr"></div><img id="simg" alt="Foto del reclamo"><div id="cap"></div></div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id),COL={rojo:'#c9372c',amarillo:'#e0a100',verde:'#2a9158'},GC=['#2a9158','#e0a100','#c9372c'],GN=['Leve','Moderada','Grave'];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cfg,cats,cat,mapa,capa,D,marc={};
+async function api(u,o){const r=await fetch(u,{credentials:'same-origin',...o});if(r.status===401){verLogin();throw 0}return r}
+function verLogin(){$('app').hidden=true;$('login').hidden=false}
+async function iniciar(){cfg=await (await fetch('/api/config')).json();cats=cfg.categorias;
+  const y=await (await fetch('/api/yo')).json();y.admin?entrar():verLogin()}
+$('go').onclick=async()=>{$('le').textContent='';const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:$('u').value,password:$('p').value})});
+  if(r.ok){$('p').value='';entrar()}else{const j=await r.json().catch(()=>({}));$('le').textContent=j.detail||'Error'}};
+$('p').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+$('out').onclick=async()=>{await fetch('/api/logout',{method:'POST'});verLogin()};
+function entrar(){$('login').hidden=true;$('app').hidden=false;
+  if(!mapa){mapa=L.map('map').setView([-19.0476,-65.2596],13);
+    L.tileLayer(cfg.carto_key?'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key='+encodeURIComponent(cfg.carto_key):'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(mapa);capa=L.layerGroup().addTo(mapa)}
+  cat=cat||cats[0];cargar()}
+let catMapa=null,SOL=[];
+async function post(u,b){const r=await api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});return r.json()}
+async function cargar(){
+  const real=cat==='__sol'?(catMapa||cats[0]):cat;if(cat!=='__sol')catMapa=cat;
+  D=await (await api('/api/admin/datos?categoria='+encodeURIComponent(real))).json();
+  $('tabs').innerHTML=cats.map(c=>`<button class="${c===cat?'on':''}" data-c="${esc(c)}">${esc(c)}${D.resumen[c].rojas?`<span class="b">${D.resumen[c].rojas}</span>`:''}</button>`).join('')
+    +`<button class="${cat==='__sol'?'on':''}" data-c="__sol">✔ Solucionados<span class="b" style="background:var(--g)">${D.n_sol}</span></button>`;
+  if(cat==='__sol'){$('vista').hidden=true;$('sol').hidden=false;return verSol()}
+  $('vista').hidden=false;$('sol').hidden=true;setTimeout(()=>mapa.invalidateSize(),50);
+  capa.clearLayers();marc={};
+  D.zonas.forEach(z=>{const n=z.nivel;L.rectangle([[z.lat0,z.lon0],[z.lat0+D.celda,z.lon0+D.celda]],{color:COL[n],weight:1,fillColor:COL[n],fillOpacity:.28})
+    .on('click',()=>{const rs=D.reclamos.filter(r=>r.celda[0]===z.i&&r.celda[1]===z.j);
+      L.popup().setLatLng([z.lat0+D.celda/2,z.lon0+D.celda/2]).setContent(popZona(z,rs)).openOn(mapa)}).addTo(capa)});
+  D.reclamos.forEach(r=>{marc[r.id]=L.circleMarker([r.lat,r.lon],{radius:7,color:'#fff',weight:1.5,fillColor:GC[r.grav],fillOpacity:1}).addTo(capa).on('click',()=>L.popup().setLatLng([r.lat,r.lon]).setContent(popRec(r)).openOn(mapa))});
+  $('lista').innerHTML=D.reclamos.length?D.reclamos.slice(0,40).map(r=>`<div class="it" data-id="${r.id}"><span class="g g${r.grav}">${GN[r.grav]}</span> ${r.fotos.length?'📷'+r.fotos.length:''}<br>${esc(r.texto.slice(0,110))}</div>`).join(''):'<p class="lg">Sin reclamos pendientes en esta categoría.</p>'}
+function boton(txt,fn,cls){const b=document.createElement('button');b.textContent=txt;if(cls)b.className=cls;b.style.margin='4px 4px 0 0';b.onclick=fn;return b}
+function popRec(r){const d=document.createElement('div');d.style.maxWidth='250px';
+  d.innerHTML=`<b>${GN[r.grav]}</b> · gravedad ${r.grav_cont}<br>${esc(r.texto)}<br><small>${new Date(r.fecha+'Z').toLocaleString()}</small>${r.veredicto!=='coincide'?`<br><small><b>Categoría:</b> el ciudadano eligió «${esc(r.cat_ciudadano)}»; el modelo sugiere «${esc(r.cat_modelo)}» (${r.p_cat}) → ${esc(r.veredicto)}</small>`:''}<br>`;
+  const b=boton(r.fotos.length?`Ver historias (${r.fotos.length})`:'Sin fotos',()=>historias([r]));b.disabled=!r.fotos.length;d.appendChild(b);
+  d.appendChild(boton('✔ Solucionado',async()=>{await post('/api/admin/reclamo/'+r.id+'/estado',{estado:'solucionado'});mapa.closePopup();cargar()},'s'));return d}
+function popZona(z,rs){const d=document.createElement('div');d.innerHTML=`<b>Zona ${z.nivel}</b><br>${z.n} reclamos · ${z.n_mg} moderados/graves · ${z.n_g} graves<br>Puntaje ${z.score.toFixed(1)}<br>`;
+  const n=rs.reduce((a,r)=>a+r.fotos.length,0),b=boton(n?`Historias de la zona (${n})`:'Sin fotos',()=>historias(rs));b.disabled=!n;d.appendChild(b);
+  d.appendChild(boton('✔ Zona solucionada',async()=>{if(!confirm('¿Marcar como solucionados los reclamos pendientes de esta zona? Saldrán del mapa y pasarán a «Solucionados».'))return;
+    await post('/api/admin/zona/resolver',{categoria:cat,i:z.i,j:z.j});mapa.closePopup();cargar()},'s'));return d}
+async function verSol(){SOL=await (await api('/api/admin/solucionados')).json();
+  $('sol').innerHTML=SOL.length?'<h2 style="margin:0 0 8px;font-size:16px">Reclamos solucionados</h2>'+SOL.map(r=>`<div class="it" data-id="${r.id}"><span class="g g${r.grav}">${GN[r.grav]}</span> ${esc(r.cat)} · solucionado el ${new Date(r.resuelto+'Z').toLocaleDateString()}<br>${esc(r.texto.slice(0,160))}<br><button class="s" data-a="reabrir">Reabrir</button> ${r.fotos.length?`<button class="s" data-a="fotos">Ver fotos (${r.fotos.length})</button>`:''}</div>`).join(''):'<p class="lg">Aún no hay reclamos solucionados.</p>'}
+$('sol').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const r=SOL.find(x=>x.id==b.closest('.it').dataset.id);if(!r)return;
+  if(b.dataset.a==='fotos')historias([r]);
+  if(b.dataset.a==='reabrir'){await post('/api/admin/reclamo/'+r.id+'/estado',{estado:'pendiente'});cargar()}};
+$('tabs').onclick=e=>{const c=e.target.closest('button');if(c){cat=c.dataset.c;cargar()}};
+$('lista').onclick=e=>{const i=e.target.closest('.it');if(i){const r=D.reclamos.find(x=>x.id==i.dataset.id);mapa.setView([r.lat,r.lon],16);L.popup().setLatLng([r.lat,r.lon]).setContent(popRec(r)).openOn(mapa)}};
+/* ---- historias estilo Instagram ---- */
+let fr=[],ix=0,tm;
+function historias(rs){fr=[];rs.forEach(r=>r.fotos.forEach(f=>fr.push({src:'/api/fotos/'+f,r})));if(!fr.length)return;ix=0;$('story').hidden=false;ver()}
+function ver(){clearTimeout(tm);const f=fr[ix];$('simg').src=f.src;
+  $('cap').innerHTML=`<span class="g g${f.r.grav}">${GN[f.r.grav]}</span> ${esc(f.r.cat_ciudadano)}<br>${esc(f.r.texto.slice(0,160))}<br><small>${new Date(f.r.fecha+'Z').toLocaleString()}</small>`;
+  $('bars').innerHTML=fr.map((_,k)=>`<i class="${k<ix?'ok':''}"><b style="${k===ix?'animation:p 5s linear forwards':''}"></b></i>`).join('');tm=setTimeout(sig,5000)}
+function sig(){ix++;ix>=fr.length?cerrar():ver()}function ant(){ix=Math.max(0,ix-1);ver()}
+function cerrar(){clearTimeout(tm);$('story').hidden=true;$('simg').src=''}
+$('zr').onclick=sig;$('zl').onclick=ant;$('x').onclick=cerrar;
+document.onkeydown=e=>{if($('story').hidden)return;if(e.key==='ArrowRight')sig();if(e.key==='ArrowLeft')ant();if(e.key==='Escape')cerrar()};
+iniciar();
+</script></body></html>

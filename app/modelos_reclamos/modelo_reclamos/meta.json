@@ -1,0 +1,26 @@
+{
+  "modelo_base": "dccuchile/bert-base-spanish-wwm-cased",
+  "max_len": 128,
+  "dropout": 0.3,
+  "categorias": [
+    "Recojo de basura",
+    "Agua y alcantarillado",
+    "Alumbrado público",
+    "Baches y vías",
+    "Transporte y tránsito",
+    "Seguridad ciudadana",
+    "Ruidos y medio ambiente",
+    "Otros"
+  ],
+  "gravedades": [
+    "0 · Leve",
+    "1 · Moderada",
+    "2 · Grave"
+  ],
+  "umbral_categoria": 0.6,
+  "umbral_grave": 0.1,
+  "autocorregir": true,
+  "f1_macro_test_categoria": 1.0,
+  "f1_macro_test_gravedad": 0.5794,
+  "formula_gravedad_continua": "0.5 * p_moderada + 1.0 * p_grave"
+}

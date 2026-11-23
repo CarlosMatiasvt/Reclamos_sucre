@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pillow
+python-multipart
+itsdangerous
+httpx
+onnxruntime
+tokenizers
+huggingface_hub
+numpy

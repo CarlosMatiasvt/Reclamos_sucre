@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reclamos ciudadanos · Sucre</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--bg:#f3f5f7;--c:#fff;--tx:#17202a;--m:#5b6673;--bd:#d9dee4;--ac:#1d4e89}
+@media (prefers-color-scheme:dark){:root{--bg:#12161b;--c:#1b2027;--tx:#e8ebef;--m:#98a2ae;--bd:#2c333c;--ac:#6fa8ff}}
+[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,sans-serif}
+main{max-width:640px;margin:auto;padding:16px}h1{font-size:21px;margin:8px 0 2px}p.s{color:var(--m);margin:0 0 12px;font-size:13.5px}
+form{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:16px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px}
+select,textarea,input[type=file]{width:100%;padding:9px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:110px}#map{height:280px;border-radius:6px;border:1px solid var(--bd)}
+button{font:inherit;font-weight:600;border:1px solid var(--ac);background:var(--ac);color:#fff;border-radius:6px;padding:10px 16px;cursor:pointer}
+button.s{background:transparent;color:var(--ac)}.h{font-size:12.5px;color:var(--m)}
+#th{display:flex;gap:6px;margin-top:6px}#th img{width:60px;height:60px;object-fit:cover;border-radius:5px}
+#msg{margin-top:12px;padding:10px;border-radius:6px;display:none}.ok{background:#d8f0e0;color:#14452a}.er{background:#f8d2cf;color:#6b1a14}
+.hp{position:absolute;left:-9999px}
+</style></head><body><main>
+<h1>Registra un reclamo en Sucre</h1>
+<p class="s">Cuéntanos el problema, marca dónde ocurre y, si puedes, agrega fotos como prueba.</p>
+<form id="f">
+ <label for="cat">Categoría</label><select id="cat" required></select>
+ <label for="txt">Describe el problema</label><textarea id="txt" required minlength="10" maxlength="1500" placeholder="Qué pasa, desde cuándo y a quién afecta."></textarea>
+ <label for="fot">Fotos (hasta 3)</label><input id="fot" type="file" accept="image/*" multiple><div id="th"></div>
+ <label>Ubicación</label>
+ <div class="h" id="ub">Haz clic en el mapa para marcar el lugar.</div>
+ <div id="map" role="application" aria-label="Mapa de Sucre"></div>
+ <p><button type="button" class="s" id="gps">Usar mi ubicación actual</button></p>
+ <input class="hp" id="web" tabindex="-1" autocomplete="off" aria-hidden="true">
+ <button type="submit" id="enviar">Enviar reclamo</button>
+ <div id="msg" role="status"></div>
+ <p class="h">Para un peligro inmediato llama a los números oficiales de emergencia: este formulario no los reemplaza. Las fotos se guardan sin datos de ubicación y solo las ve la administración.</p>
+</form></main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id);let punto=null,marcador=null,fotos=[];
+const mapa=L.map('map').setView([-19.0476,-65.2596],13);
+fetch('/api/config').then(r=>r.json()).then(c=>{
+  $('cat').innerHTML='<option value="">Elige una categoría</option>'+c.categorias.map(x=>`<option>${x}</option>`).join('');
+  const u=c.carto_key?'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key='+encodeURIComponent(c.carto_key):'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  L.tileLayer(u,{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'+(c.carto_key?' &copy; CARTO':'')}).addTo(mapa);});
+function fijar(la,lo){punto=[la,lo];marcador?marcador.setLatLng([la,lo]):marcador=L.marker([la,lo]).addTo(mapa);$('ub').textContent='Ubicación marcada.';}
+mapa.on('click',e=>fijar(e.latlng.lat,e.latlng.lng));
+$('gps').onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(p=>{fijar(p.coords.latitude,p.coords.longitude);mapa.setView([p.coords.latitude,p.coords.longitude],16)},()=>alert('No se pudo obtener tu ubicación; márcala en el mapa.')):alert('Tu navegador no permite ubicación.');
+function reducir(f){return new Promise(ok=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1280/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);c.toBlob(b=>ok(b),'image/jpeg',.8)};im.src=URL.createObjectURL(f)})}
+$('fot').onchange=async e=>{fotos=[];$('th').innerHTML='';for(const f of [...e.target.files].slice(0,3)){const b=await reducir(f);fotos.push(b);const i=new Image();i.src=URL.createObjectURL(b);$('th').appendChild(i)}};
+function aviso(t,ok){const m=$('msg');m.className=ok?'ok':'er';m.textContent=t;m.style.display='block'}
+$('f').onsubmit=async e=>{e.preventDefault();if(!punto)return aviso('Marca la ubicación en el mapa.',0);
+  const d=new FormData();d.append('texto',$('txt').value);d.append('categoria',$('cat').value);d.append('lat',punto[0]);d.append('lon',punto[1]);d.append('web',$('web').value);
+  fotos.forEach((b,i)=>d.append('fotos',b,'foto'+i+'.jpg'));$('enviar').disabled=true;
+  try{const r=await fetch('/api/reclamos',{method:'POST',body:d});const j=await r.json().catch(()=>({}));
+    if(r.ok){aviso('¡Gracias! Tu reclamo fue registrado (n.º '+j.id+').',1);$('f').reset();$('th').innerHTML='';fotos=[];quitar()}
+    else aviso(typeof j.detail==='string'?j.detail:'No se pudo enviar. Revisa los datos.',0)}
+  catch(_){aviso('Sin conexión. Inténtalo de nuevo.',0)}$('enviar').disabled=false};
+function quitar(){punto=null;marcador&&mapa.removeLayer(marcador);marcador=null;$('ub').textContent='Haz clic en el mapa para marcar el lugar.'}
+</script></body></html>

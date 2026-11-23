@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pillow
+python-multipart
+itsdangerous
+httpx
+transformers
+huggingface_hub

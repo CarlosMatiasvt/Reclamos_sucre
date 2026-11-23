@@ -1,0 +1,5 @@
+env.yaml
+variables.env
+.env
+*.db
+__pycache__/

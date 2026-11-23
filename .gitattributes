@@ -1,0 +1,8 @@
+/app/modelo_onnx/modelo.int8.onnx filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/model.safetensors filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/modelo.int8.onnx filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/modelo_fp32.onnx filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/modelo_onnx.zip filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/modelo_onnx/modelo.int8.onnx filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/modelo_reclamos.zip filter=lfs diff=lfs merge=lfs -text
+/app/modelos_reclamos/modelo_reclamos/model.safetensors filter=lfs diff=lfs merge=lfs -text
